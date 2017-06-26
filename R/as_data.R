@@ -1,0 +1,47 @@
+#' @name as_data
+#' @title convert other objects to greta arrays
+#' @description define an object in an R session as a data greta array for use
+#'   as data in a greta model.
+#' @param x an R object that can be coerced to a greta_array (see details).
+#' @details \code{as_data()} can currently convert R objects to greta_arrays if they are
+#'   numeric or logical vectors, matrices or arrays; or if they are dataframes
+#'   with only numeric (including integer) or logical elements. Logical elements
+#'   are always converted to numerics. R objects cannot be converted if they
+#'   contain missing (\code{NA}) or infinite (\code{-Inf} or \code{Inf}) values.
+#' @export
+#' @examples
+#'
+#' # numeric/integer/logical vectors, matrices and arrays can all be coerced to
+#' # data greta arrays
+#'
+#' vec <- rnorm(10)
+#' mat <- matrix(seq_len(3 * 4), nrow = 3)
+#' arr <- array(sample(c(TRUE, FALSE), 2 * 2 * 2, replace = TRUE), dim = c(2, 2, 2))
+#' (a <- as_data(vec))
+#' (b <- as_data(mat))
+#' (c <- as_data(arr))
+#'
+#' # dataframes can also be coerced, provided all the columns are numeric,
+#' # integer or logical
+#' df <- data.frame(x1 = rnorm(10),
+#'                  x2 = sample(1L:10L),
+#'                  x3 = sample(c(TRUE, FALSE), 10, replace = TRUE))
+#' (d <- as_data(df))
+#'
+as_data <- function (x)
+  UseMethod('as_data', x)
+
+# if it's already a *data* greta_array fine, else error
+#' @export
+as_data.greta_array <- function (x) {
+  if (!inherits(x$node, 'data_node')) {
+    stop ('cannot coerce a non-data greta_array to data',
+          call. = FALSE)
+  }
+  x
+}
+
+# otherwise try to coerce to a greta array
+#' @export
+as_data.default <- function (x)
+  as.greta_array(x)
