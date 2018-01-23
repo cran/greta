@@ -9,6 +9,8 @@
 #' # extract
 #' x[i]
 #' x[i, j, ..., drop = FALSE]
+#' head(x, n = 6L, ...)
+#' tail(x, n = 6L, ...)
 #'
 #' # replace
 #' x[i] <- value
@@ -20,17 +22,27 @@
 #' c(..., recursive = FALSE)
 #' rep(x, times, ..., recursive = FALSE)
 #'
+#' # get and set dimensions
+#' length(x)
+#' dim(x)
+#' dim(x) <- value
 #' }
 #'
+#' @param x a greta array
 #' @param i,j indices specifying elements to extract or replace
-#' @param value a greta array to replace elements
+#' @param n a single integer, as in \code{utils::head()} and
+#'   \code{utils::tail()}
+#' @param value for \code{`[<-`} a greta array to replace elements, for
+#'   \code{`dim<-`} either NULL or a numeric vector of dimensions
 #' @param ... either further indices specifying elements to extract or replace
-#'   (\code{[}), or multiple greta arrays to combine (\code{cbind()}, \code{rbind()} &
-#'   \code{c()}), or additional arguments (\code{rep()})
+#'   (\code{[}), or multiple greta arrays to combine (\code{cbind()},
+#'   \code{rbind()} & \code{c()}), or additional arguments (\code{rep()},
+#'   \code{head()}, \code{tail()})
 #' @param drop,recursive generic arguments that are ignored for greta arrays
 #'
 #' @examples
 #' \dontrun{
+#'
 #'  x = as_data(matrix(1:12, 3, 4))
 #'
 #'  # extract/replace
@@ -44,88 +56,6 @@
 #'  rep(x[, 2], times = 3)
 #' }
 NULL
-
-# map R's extract and replace syntax to tensorflow, for use in operation nodes
-# the following arguments are required:
-#   nelem - number of elements in the original array,
-#   tf_index - rank 1 tensor giving index to subsetted elements in flattened
-#     input tensor
-#   dims_out - dimension of output array
-tf_extract <- function (x, nelem, index, dims_out) {
-
-  # flatten tensor, gather using index, reshape to output dimension
-  tensor_in_flat <- tf$reshape(x, shape(nelem))
-  tf_index <- tf$constant(as.integer(index), dtype = tf_int())
-  tensor_out_flat <- tf$gather(tensor_in_flat, tf_index)
-  tensor_out <- tf$reshape(tensor_out_flat, to_shape(dims_out))
-  tensor_out
-
-}
-
-# using tf$concat, update the elements of a tensor `ref`, putting the new
-# values, a tensor `updates` at the elements given by the R vector `index` (in
-# 0-indexing)
-tf_recombine <- function (ref, index, updates) {
-
-  # vector denoting whether an element is being updated
-  nelem <- ref$get_shape()$as_list()[1]
-  replaced <- rep(0, nelem)
-  replaced[index + 1] <- seq_along(index)
-  runs <- rle(replaced)
-
-  # number of blocks to concatenate
-  nblock <- length(runs$lengths)
-
-  # start location (R-style) for each block in the original object
-  starts_old <- cumsum(c(0, runs$lengths[-nblock])) + 1
-
-  # list of non-updated values
-  keep_idx <- which(runs$values == 0)
-  keep_list <- lapply(keep_idx, function (i) {
-    idx <- starts_old[i] + 0:(runs$lengths[i] - 1) - 1
-    tf$reshape(ref[idx], shape(length(idx), 1))
-  })
-
-  run_id <- runs$values[runs$values != 0]
-  update_idx <- match(run_id, runs$values)
-  # get them in order increasing order
-  update_list <- lapply(run_id, function (i) {
-    tf$reshape(updates[i - 1], shape(1, 1))
-  })
-
-  # combine them
-  full_list <- list()
-  full_list[keep_idx] <- keep_list
-  full_list[update_idx] <- update_list
-
-  # concatenate the vectors
-  result <- tf$concat(full_list, 0L)
-
-  # rotate it
-  result <- tf$reshape(result, shape(result$get_shape()$as_list()[1]))
-  result
-
-}
-
-# replace elements in a tensor with another tensor
-tf_replace <- function (x, replacement, index, dims) {
-
-  # flatten original tensor and new values
-  nelem <- prod(dims)
-  x_flat <- tf$reshape(x, shape(nelem))
-  replacement_flat <- tf$reshape(replacement, shape(length(index)))
-
-  # update the values into a new tensor
-  result_flat <- tf_recombine(ref = x_flat,
-                           index = index,
-                           updates = replacement_flat)
-
-  # reshape the result
-  result <- tf$reshape(result_flat, to_shape(dims))
-  result
-
-}
-
 
 # extract syntax for greta_array objects
 #' @export
@@ -204,7 +134,7 @@ tf_replace <- function (x, replacement, index, dims) {
      operation_args = list(nelem = nelem,
                            index = index,
                            dims_out = dims_out),
-     tf_operation = 'tf_extract',
+     tf_operation = tf_extract,
      value = values)
 
 }
@@ -214,7 +144,7 @@ tf_replace <- function (x, replacement, index, dims) {
 `[<-.greta_array` <- function(x, ..., value) {
 
   if (inherits(x$node, 'variable_node')) {
-    stop('cannot replace values in a variable greta array',
+    stop ('cannot replace values in a variable greta array',
          call. = FALSE)
   }
 
@@ -281,19 +211,8 @@ tf_replace <- function (x, replacement, index, dims) {
      operation_args = list(index = index,
                            dims = dims),
      value = new_value,
-     tf_operation = 'tf_replace')
+     tf_operation = tf_replace)
 
-}
-
-# mapping of cbind and rbind to tf$concat
-tf_cbind <- function (...) {
-  elem_list <- list(...)
-  tf$concat(elem_list, 1L)
-}
-
-tf_rbind <- function (...) {
-  elem_list <- list(...)
-  tf$concat(elem_list, 0L)
 }
 
 #' @export
@@ -301,7 +220,7 @@ cbind.greta_array <- function (...) {
 
   dimfun <- function (elem_list) {
 
-    dims <- lapply(elem_list, function(x) x$dim)
+    dims <- lapply(elem_list, dim)
     ndims <- vapply(dims, length, FUN.VALUE = 1)
     if (!all(ndims == 2))
       stop ('all greta arrays must be two-dimensional')
@@ -321,7 +240,7 @@ cbind.greta_array <- function (...) {
   }
 
   op('cbind', ..., dimfun = dimfun,
-     tf_operation = 'tf_cbind')
+     tf_operation = tf_cbind)
 
 }
 
@@ -330,7 +249,7 @@ rbind.greta_array <- function (...) {
 
   dimfun <- function (elem_list) {
 
-    dims <- lapply(elem_list, function(x) x$dim)
+    dims <- lapply(elem_list, dim)
     ndims <- vapply(dims, length, FUN.VALUE = 1)
     if (!all(ndims == 2))
       stop ('all greta arrays must be two-dimensional')
@@ -350,7 +269,7 @@ rbind.greta_array <- function (...) {
   }
 
   op('rbind', ..., dimfun = dimfun,
-     tf_operation = 'tf_rbind')
+     tf_operation = tf_rbind)
 
 }
 
@@ -373,7 +292,7 @@ c.greta_array <- function (...) {
           c(operation = 'rbind',
             arrays,
             dimfun = dimfun,
-            tf_operation = 'tf_rbind'))
+            tf_operation = tf_rbind))
 
 }
 
@@ -385,5 +304,137 @@ rep.greta_array <- function (x, ...) {
 
   # apply (implicitly coercing to a column vector)
   x[idx]
+
+}
+
+
+# get dimensions
+#' @export
+dim.greta_array <- function(x)
+  as.integer(x$node$dim)
+
+#' @export
+length.greta_array <- function(x)
+  prod(dim(x))
+
+# reshape greta arrays
+#' @export
+`dim<-.greta_array` <- function (x, value) {
+
+  dims <- value
+
+  if (is.null(dims))
+    dims <- length(x)
+
+  if (length(dims) == 0L)
+    stop ("length-0 dimension vector is invalid",
+          call. = FALSE)
+
+  if (length(dims) == 1L)
+    dims <- c(dims, 1L)
+
+  if (any(is.na(dims)))
+    stop("the dims contain missing values",
+         call. = FALSE)
+
+  dims <- as.integer(dims)
+
+  if (any(dims < 0L))
+    stop ("the dims contain negative values",
+          call. = FALSE)
+
+  prod_dims <- prod(dims)
+  len <- length(x)
+
+  if (prod_dims != len) {
+    msg <- sprintf("dims [product %i] do not match the length of object [%i]",
+                   prod_dims, len)
+    stop (msg, call. = FALSE)
+  }
+
+  dimfun <- function (elem_list)
+    dims
+
+  new_value <- x$node$value()
+  dim(new_value) <- dims
+
+  op("reshape",
+     x,
+     operation_args = list(shape = dims),
+     tf_operation = tf$reshape,
+     dimfun = dimfun,
+     value = new_value)
+
+}
+
+# head handles matrices differently to arrays, so explicitly handle 2D greta
+# arrays
+#' @export
+#' @importFrom utils head
+head.greta_array <- function (x, n = 6L, ...) {
+
+  stopifnot(length(n) == 1L)
+
+  # if x is matrix-like, take the top n rows
+  if (length(dim(x)) == 2) {
+
+    nrx <- nrow(x)
+    if (n < 0L)
+      n <- max(nrx + n, 0L)
+    else
+      n <- min(n, nrx)
+
+    ans <- x[seq_len(n), , drop = FALSE]
+
+  } else {
+    # otherwise, take the first n elements
+
+    if (n < 0L)
+      n <- max(length(x) + n, 0L)
+    else
+      n <- min(n, length(x))
+
+    ans <- x[seq_len(n)]
+
+  }
+
+  ans
+
+}
+
+#' @export
+#' @importFrom utils tail
+tail.greta_array <- function (x, n = 6L, ...) {
+
+  stopifnot(length(n) == 1L)
+
+  # if x is matrix-like, take the top n rows
+  if (length(dim(x)) == 2) {
+
+    nrx <- nrow(x)
+
+    if (n < 0L)
+      n <- max(nrx + n, 0L)
+    else
+      n <- min(n, nrx)
+
+    sel <- as.integer(seq.int(to = nrx, length.out = n))
+    ans <- x[sel, , drop = FALSE]
+
+  } else {
+    # otherwise, take the first n elements
+
+    xlen <- length(x)
+
+    if (n < 0L)
+      n <- max(xlen + n, 0L)
+    else
+      n <- min(n, xlen)
+
+    ans <- x[seq.int(to = xlen, length.out = n)]
+
+  }
+
+  ans
 
 }

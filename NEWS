@@ -1,0 +1,23 @@
+### greta 0.2.2
+================
+
+New functionality:
+
+* added `forwardsolve()` and `backsolve()`
+* added `colSums()`, `rowSums()`, `colMeans()`, and `rowMeans()`
+* added `dim<-()` to reshape greta arrays
+* `sweep()` now handles greta array `STATS` when `x` is numeric
+
+
+### greta 0.2.1
+================
+
+New functionality:
+
+* export internal functions via `.internals` object to enable extension packages
+
+API changes:
+
+* removed the deprecated `define_model()`, an alias for `model()`
+* removed the dynamics module, to be replaced by the gretaDynamics package
+

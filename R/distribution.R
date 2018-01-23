@@ -17,6 +17,7 @@
 #'
 #' @export
 #' @examples
+#' \dontrun{
 #'
 #' # define a model likelihood
 #'
@@ -31,7 +32,7 @@
 #'
 #' # get the distribution over y
 #' distribution(y)
-#'
+#' }
 `distribution<-` <- function (greta_array, value) {
 
   # stash the old greta array to return
@@ -53,7 +54,7 @@
   }
 
   # can only assign with greta arrays ...
-  if (!is.greta_array(value)) {
+  if (!inherits(value, "greta_array")) {
     stop ("right hand side must be a greta array",
           call. = FALSE)
   }
@@ -98,7 +99,7 @@
 distribution <- function (greta_array) {
 
   # only for greta arrays
-  if (!is.greta_array(greta_array)) {
+  if (!inherits(greta_array, "greta_array")) {
     stop ('not a greta array',
           call. = FALSE)
   }

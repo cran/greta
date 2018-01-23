@@ -24,6 +24,8 @@
 #'  for an example.
 #'
 #' @examples
+#' \dontrun{
+#'
 #' # a scalar variable
 #' a <- variable()
 #'
@@ -37,10 +39,10 @@
 #' min <- as_data(iris$Sepal.Length)
 #' max <- min ^ 2
 #' d <- min + variable(0, 1, dim = nrow(iris)) * (max - min)
-#'
+#' }
 variable <- function (lower = -Inf, upper = Inf, dim = 1) {
 
-  if (is.greta_array(lower) | is.greta_array(upper))
+  if (inherits(lower, "greta_array") | inherits(upper, "greta_array"))
     stop ('lower and upper must be fixed, they cannot be another greta array')
 
   node <- variable_node$new(lower, upper, dim)
