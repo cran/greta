@@ -1,4 +1,14 @@
-# greta 0.3.0 (in development)
+# greta 0.3.1
+
+This release is predominantly a patch to make greta work with recent versions of TensorFlow and TensorFlow Probability, which were not backward compatible with the versions on which greta previously depended. From this release forward, greta will depend on specific (rather than minimum) versions of these two pieces of software to avoid it breaking if more changes are made to the APIS of these packages.
+
+* greta now (only) works with TensorFlow 1.14.0 and TensorFlow Probability 0.7.0 (#289, #290)
+
+* behaviour of the `pb_update` argument to `mcmc()` has been changed slightly to avoid a bad interaction with thinning (#284)
+
+* various edits to the documentation to fix spelling mistakes and typos
+
+# greta 0.3.0
 
 This is a very large update which adds a number of features and major speed improvements. We now depend on the TensorFlow Probability Python package, and use functionality in that package wherever possible. Sampling a simple model now takes ~10s, rather than ~2m (>10x speedup).
 
