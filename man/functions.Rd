@@ -5,24 +5,30 @@
 \title{functions for greta arrays}
 \description{
 This is a list of functions (mostly from base R) that are
-  currently implemented to transform greta arrays. Also see \link{operators}
-  and \link{transforms}.
+currently implemented to transform greta arrays. Also see \link{operators}
+and \link{transforms}.
 }
 \details{
 TensorFlow only enables rounding to integers, so \code{round()} will
-  error if \code{digits} is set to anything other than \code{0}.
+error if \code{digits} is set to anything other than \code{0}.
 
-  Any additional arguments to \code{chol()}, \code{chol2inv}, and
-  \code{solve()} will be ignored, see the TensorFlow documentation for
-  details of these routines.
+Any additional arguments to \code{chol()}, \code{chol2inv}, and
+\code{solve()} will be ignored, see the TensorFlow documentation for
+details of these routines.
 
-  \code{sweep()} only works on two-dimensional greta arrays (so \code{MARGIN}
-  can only be either 1 or 2), and only for subtraction, addition, division
-  and multiplication.
+\code{sweep()} only works on two-dimensional greta arrays (so \code{MARGIN}
+can only be either 1 or 2), and only for subtraction, addition, division
+and multiplication.
 
-  \code{tapply()} works on column vectors (2D greta arrays with one column),
-  and \code{INDEX} cannot be a greta array. Currently five functions are
-  available, and arguments passed to \dots are ignored.
+\code{tapply()} works on column vectors (2D greta arrays with one column),
+and \code{INDEX} cannot be a greta array. Currently five functions are
+available, and arguments passed to \dots are ignored.
+
+\code{cospi()}, \code{sinpi()}, and \code{tanpi()} do not use the
+computationally more stable routines to compute \code{cos(x * pi)} etc.
+that are available in R under some operating systems. Similarly
+\code{trigamma()} uses TensorFlow's polygamma function, resulting in lower
+precision than R's equivalent.
 }
 \section{Usage}{
  \preformatted{
@@ -51,10 +57,20 @@ TensorFlow only enables rounding to integers, so \code{round()} will
  acos(x)
  asin(x)
  atan(x)
+ cosh(x)
+ sinh(x)
+ tanh(x)
+ acosh(x)
+ asinh(x)
+ atanh(x)
+ cospi(x)
+ sinpi(x)
+ tanpi(x)
 
  # special mathematical functions
  lgamma(x)
  digamma(x)
+ trigamma(x)
  choose(n, k)
  lchoose(n, k)
 
@@ -75,6 +91,8 @@ TensorFlow only enables rounding to integers, so \code{round()} will
  # cumulative operations
  cumsum(x)
  cumprod(x)
+ cummax(x)
+ cummin(x)
 
  # solve an upper or lower triangular system
  backsolve(r, x, k = ncol(r), upper.tri = TRUE,
@@ -82,7 +100,7 @@ TensorFlow only enables rounding to integers, so \code{round()} will
  forwardsolve(l, x, k = ncol(l), upper.tri = FALSE,
               transpose = FALSE)
 
- #'  # miscellaneous operations
+ # miscellaneous operations
  aperm(x, perm)
  apply(x, MARGIN, FUN = c("sum", "max", "mean", "min",
                           "prod", "cumsum", "cumprod"))
@@ -103,6 +121,6 @@ d <- abs(x - 5)
 
 z <- t(a)
 
-y <- sweep(x, 1, e, '-')
+y <- sweep(x, 1, e, "-")
 }
 }

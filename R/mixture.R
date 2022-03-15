@@ -1,11 +1,11 @@
 #' @name mixture
 #' @title mixtures of probability distributions
 #'
-#' @description \code{mixture} combines other probability distributions into a
+#' @description `mixture` combines other probability distributions into a
 #'   single mixture distribution, either over a variable, or for fixed data.
 #'
 #' @param ... variable greta arrays following probability distributions (see
-#'   \code{\link{distributions}}); the component distributions in a mixture
+#'   [distributions()]); the component distributions in a mixture
 #'   distribution.
 #'
 #' @param weights a column vector or array of mixture weights, which must be
@@ -16,10 +16,10 @@
 #' @param dim the dimensions of the greta array to be returned, either a scalar
 #'   or a vector of positive integers.
 #'
-#' @details The \code{weights} are rescaled to sum to one along the first
+#' @details The `weights` are rescaled to sum to one along the first
 #'   dimension, and are then used as the mixing weights of the distribution.
-#'   \emph{Ie.} the probability density is calculated as a weighted sum of the
-#'   component probability distributions passed in via \code{\dots}
+#'   I.e. the probability density is calculated as a weighted sum of the
+#'   component probability distributions passed in via `\dots`
 #'
 #'   The component probability distributions must all be either continuous or
 #'   discrete, and must have the same dimensions.
@@ -30,22 +30,26 @@
 #' # a scalar variable following a strange bimodal distibution
 #' weights <- uniform(0, 1, dim = 3)
 #' a <- mixture(normal(-3, 0.5),
-#'              normal(3, 0.5),
-#'              normal(0, 3),
-#'              weights = weights)
+#'   normal(3, 0.5),
+#'   normal(0, 3),
+#'   weights = weights
+#' )
 #' m <- model(a)
 #' plot(mcmc(m, n_samples = 500))
 #'
 #' # simulate a mixture of poisson random variables and try to recover the
 #' # parameters with a Bayesian model
-#' x <- c(rpois(800, 3),
-#'        rpois(200, 10))
+#' x <- c(
+#'   rpois(800, 3),
+#'   rpois(200, 10)
+#' )
 #'
 #' weights <- uniform(0, 1, dim = 2)
 #' rates <- normal(0, 10, truncation = c(0, Inf), dim = 2)
 #' distribution(x) <- mixture(poisson(rates[1]),
-#'                            poisson(rates[2]),
-#'                            weights = weights)
+#'   poisson(rates[2]),
+#'   weights = weights
+#' )
 #' m <- model(rates)
 #' draws_rates <- mcmc(m, n_samples = 500)
 #'
@@ -63,24 +67,33 @@
 #' dim <- c(5, 4)
 #' weights <- uniform(0, 1, dim = c(2, dim))
 #' b <- mixture(normal(1, 1, dim = dim),
-#'              normal(-1, 1, dim = dim),
-#'              weights = weights)
+#'   normal(-1, 1, dim = dim),
+#'   weights = weights
+#' )
 #' }
-mixture <- function(..., weights, dim = NULL)
+mixture <- function(..., weights, dim = NULL) {
   distrib("mixture", list(...), weights, dim)
+}
 
 mixture_distribution <- R6Class(
   "mixture_distribution",
   inherit = distribution_node,
   public = list(
-
+    weights_is_log = FALSE,
     initialize = function(dots, weights, dim) {
-
       n_distributions <- length(dots)
 
       if (n_distributions < 2) {
-        stop("mixture must be passed at least two distributions",
-             call. = FALSE)
+        msg <- cli::format_error(
+          c(
+            "{.fun mixture} must be passed at least two distributions",
+            "The number of distributions passed was: {.val {n_distributions}}"
+          )
+        )
+        stop(
+          msg,
+          call. = FALSE
+        )
       }
 
       # check the dimensions of the variables in dots
@@ -89,12 +102,25 @@ mixture_distribution <- R6Class(
       weights <- as.greta_array(weights)
       weights_dim <- dim(weights)
 
+      # use log weights if available
+      if (has_representation(weights, "log")) {
+        weights <- representation(weights, "log")
+        self$weights_is_log <- TRUE
+      }
+
       # weights should have n_distributions as the first dimension
       if (weights_dim[1] != n_distributions) {
-        stop("the first dimension of weights must be the number of ",
-             "distributions in the mixture (", n_distributions, "), ",
-             "but was ", weights_dim[1],
-             call. = FALSE)
+        msg <- cli::format_error(
+          c(
+            "the first dimension of weights must be the number of \\
+            distributions in the mixture ({.val {n_distributions}})",
+            "However it was {.val {weights_dim[1]}}"
+          )
+        )
+        stop(
+          msg,
+          call. = FALSE
+        )
       }
 
       # drop a trailing 1 from dim, so user doesn't need to deal with it
@@ -109,11 +135,19 @@ mixture_distribution <- R6Class(
       w_dim <- weights_dim[-1]
       dim_1 <- length(w_dim) == 1 && w_dim == 1
       dim_same <- all(w_dim == weights_extra_dim)
-      if ( !(dim_1 | dim_same) ) {
-        stop("the dimension of weights must be either ", n_distributions,
-             " x 1 or ", n_distributions, " x ", paste(dim, collapse = " x "),
-             " but was ", paste(weights_dim, collapse = " x "),
-             call. = FALSE)
+      if (!(dim_1 | dim_same)) {
+        msg <- cli::format_error(
+          c(
+            "the dimension of weights must be either \\
+            {.val {n_distributions}x1} or \\
+            {.val {n_distributions}x{paste(dim, collapse = 'x')}}",
+            " but was {.val {paste(weights_dim, collapse = 'x')}}"
+          )
+        )
+        stop(
+          msg,
+          call. = FALSE
+        )
       }
 
       dot_nodes <- lapply(dots, get_node)
@@ -126,38 +160,142 @@ mixture_distribution <- R6Class(
       lapply(dot_nodes, function(x) x$distribution <- NULL)
 
       # check the distributions are all either discrete or continuous
-      discrete <- vapply(distribs, member, "discrete", FUN.VALUE = FALSE)
+      discrete <- vapply(distribs, member, "discrete", FUN.VALUE = logical(1))
 
       if (!all(discrete) & !all(!discrete)) {
-        stop("cannot construct a mixture from a combination of discrete ",
-             "and continuous distributions",
-             call. = FALSE)
+        msg <- cli::format_error(
+          "cannot construct a mixture from a combination of discrete and \\
+          continuous distributions"
+        )
+        stop(
+          msg,
+          call. = FALSE
+        )
       }
 
+      # check the distributions are all either multivariate or univariate
+      multivariate <- vapply(distribs,
+        member,
+        "multivariate",
+        FUN.VALUE = logical(1)
+      )
+
+      if (!all(multivariate) & !all(!multivariate)) {
+        msg <- cli::format_error(
+          "cannot construct a mixture from a combination of multivariate and \\
+          univariate distributions"
+        )
+        stop(
+          msg,
+          call. = FALSE
+        )
+      }
+
+      # ensure the support and bounds of each of the distributions is the same
+      truncations <- lapply(distribs, member, "truncation")
+      bounds <- lapply(distribs, member, "bounds")
+
+      truncated <- !vapply(truncations, is.null, logical(1))
+      supports <- bounds
+      supports[truncated] <- truncations[truncated]
+
+      n_supports <- length(unique(supports))
+      if (n_supports != 1) {
+        supports_text <- vapply(
+          X = unique(supports),
+          FUN = paste,
+          collapse = " to ",
+          FUN.VALUE = character(1)
+        )
+
+        msg <- cli::format_error(
+          c(
+            "component distributions must have the same support",
+            "However the component distributions have different support:",
+            "{.val {paste(supports_text, collapse = ' vs. ')}}"
+          )
+        )
+        stop(
+          msg,
+          call. = FALSE
+        )
+      }
+
+      # get the maximal bounds for all component distributions
+      bounds <- c(
+        do.call(min, bounds),
+        do.call(max, bounds)
+      )
+
+      # if the support is smaller than this, treat the distribution as truncated
+      support <- supports[[1]]
+      if (identical(support, bounds)) {
+        truncation <- NULL
+      } else {
+        truncation <- support
+      }
+
+      self$bounds <- support
+
       # for any discrete ones, tell them they are fixed
-      super$initialize("mixture", dim, discrete = discrete[1])
+      super$initialize("mixture",
+        dim,
+        discrete = discrete[1],
+        multivariate = multivariate[1]
+      )
 
       for (i in seq_len(n_distributions)) {
         self$add_parameter(distribs[[i]],
-                           paste("distribution", i))
+          glue::glue("distribution {i}"),
+          shape_matches_output = FALSE
+        )
       }
 
       self$add_parameter(weights, "weights")
     },
-
+    create_target = function(truncation) {
+      vble(self$bounds, dim = self$dim)
+    },
     tf_distrib = function(parameters, dag) {
 
-      densities <- parameters[names(parameters) != "weights"]
-      names(densities) <- NULL
+      # get information from the *nodes* for component distributions, not the tf
+      # objects passed in here
+
+      # get tfp distributions, truncations, & bounds of component distributions
+      distribution_nodes <- self$parameters[names(self$parameters) != "weights"]
+      truncations <- lapply(distribution_nodes, member, "truncation")
+      bounds <- lapply(distribution_nodes, member, "bounds")
+      tfp_distributions <- lapply(distribution_nodes, dag$get_tfp_distribution)
+      names(tfp_distributions) <- NULL
+
       weights <- parameters$weights
-      weights_sum <- tf$reduce_sum(weights, 1L, keepdims = TRUE)
-      weights <- weights / weights_sum
-      log_weights <- tf$math$log(weights)
+
+      # use log weights if available
+      if (self$weights_is_log) {
+        log_weights <- weights
+      } else {
+        log_weights <- tf$math$log(weights)
+      }
+
+      # normalise weights on log scale
+      log_weights_sum <- tf$reduce_logsumexp(
+        log_weights,
+        axis = 1L,
+        keepdims = TRUE
+      )
+      log_weights <- log_weights - log_weights_sum
 
       log_prob <- function(x) {
 
         # get component densities in an array
-        log_probs <- lapply(densities, do.call, list(x))
+        log_probs <- mapply(
+          dag$tf_evaluate_density,
+          tfp_distribution = tfp_distributions,
+          truncation = truncations,
+          bounds = bounds,
+          MoreArgs = list(tf_target = x),
+          SIMPLIFY = FALSE
+        )
         log_probs_arr <- tf$stack(log_probs, 1L)
 
         # massage log_weights into the same shape as log_probs_arr
@@ -178,13 +316,52 @@ mixture_distribution <- R6Class(
         tf$reduce_logsumexp(log_probs_weighted_arr, axis = 1L)
       }
 
-      list(log_prob = log_prob, cdf = NULL, log_cdf = NULL)
+      sample <- function(seed) {
 
-    },
+        # draw samples from each component
+        samples <- lapply(distribution_nodes, dag$draw_sample)
+        names(samples) <- NULL
 
-    tf_cdf_function = NULL,
-    tf_log_cdf_function = NULL
+        ndim <- length(self$dim)
 
+        # in univariate case, tile log_weights to match dim, so each element can
+        # be selected independently (otherwise each row is kept together)
+        log_weights <- tf$squeeze(log_weights, 2L)
+
+        if (!self$multivariate) {
+          for (i in seq_len(ndim)) {
+            log_weights <- tf$expand_dims(log_weights, 1L)
+          }
+          log_weights <- tf$tile(log_weights, c(1L, self$dim, 1L))
+        }
+
+        # for each observation, select a random component to sample from
+        cat <- tfp$distributions$Categorical(logits = log_weights)
+        indices <- cat$sample(seed = seed)
+
+        # how many dimensions to consider a batch differs beetween multivariate
+        # and univariate
+        collapse_axis <- ndim + 1L
+        n_batches <- ifelse(self$multivariate, 1L, collapse_axis)
+
+        # combine the random components on an extra last dimension
+        samples_padded <- lapply(samples, tf$expand_dims, axis = collapse_axis)
+        samples_array <- tf$concat(samples_padded, axis = collapse_axis)
+
+        # extract the relevant component
+        indices <- tf$expand_dims(indices, n_batches)
+        draws <- tf$gather(samples_array,
+          indices,
+          axis = collapse_axis,
+          batch_dims = n_batches
+        )
+        draws <- tf$squeeze(draws, collapse_axis)
+
+        draws
+      }
+
+      list(log_prob = log_prob, sample = sample)
+    }
   )
 )
 

@@ -1,4 +1,4 @@
-## ----setup, include = FALSE----------------------------------------------
+## ----setup, include = FALSE---------------------------------------------------
 
 knitr::opts_chunk$set(echo = TRUE,
                       eval = greta:::check_tf_version("message"),
@@ -16,39 +16,55 @@ if (!file.exists("figures"))
 file.copy("../man/figures/plotlegend.png",
           "figures/plotlegend.png")
 
-## ----install_greta, eval = FALSE-----------------------------------------
+## ----install_greta, eval = FALSE----------------------------------------------
 #  install.packages("greta")
 
-## ----install_greta_github, eval = FALSE----------------------------------
+## ----install_greta_github, eval = FALSE---------------------------------------
 #  devtools::install_github("greta-dev/greta")
 
-## ----load----------------------------------------------------------------
+## ----load---------------------------------------------------------------------
 library(greta)
 
-## ----install_tf_conda, eval = FALSE--------------------------------------
-#  install_tensorflow(method = "conda")
+## ----install_tensorflow, eval = FALSE-----------------------------------------
+#  reticulate::install_miniconda()
+#  reticulate::conda_create(
+#          envname = "greta-env",
+#          python_version = "3.7"
+#        )
+#  reticulate::conda_install(
+#          envname = "greta-env",
+#          packages = c(
+#            "numpy==1.16.4",
+#            "tensorflow-probability==0.7.0",
+#            "tensorflow==1.14.0"
+#          )
+#        )
 
-## ----install_tfp_conda, eval = FALSE-------------------------------------
-#  reticulate::conda_install("r-tensorflow", "tensorflow-probability", pip = TRUE)
+## ----install-deps-plain, eval = FALSE-----------------------------------------
+#  reticulate::install_miniconda()
+#  reticulate::conda_install(
+#          packages = c(
+#            "numpy==1.16.4",
+#            "tensorflow-probability==0.7.0",
+#            "tensorflow==1.14.0"
+#          )
+#        )
 
-## ----install_tensorflow, eval = FALSE------------------------------------
-#  install_tensorflow(extra_packages = "tensorflow-probability")
-
-## ----install_diagrammer, eval = FALSE------------------------------------
+## ----install_diagrammer, eval = FALSE-----------------------------------------
 #  install.packages("igraph")
 #  install.packages("DiagrammeR")
 
-## ----ones----------------------------------------------------------------
+## ----ones---------------------------------------------------------------------
 (z <- ones(3, 3))
 
-## ----ones_op-------------------------------------------------------------
+## ----ones_op------------------------------------------------------------------
 (z2 <- z + z ^ 2)
 
-## ----variable------------------------------------------------------------
+## ----variable-----------------------------------------------------------------
 (a <- variable(dim = c(3, 3)))
 (a2 <- a + a ^ 2)
 
-## ----first_model, eval = FALSE-------------------------------------------
+## ----first_model, eval = FALSE------------------------------------------------
 #  library(greta)
 #  
 #  # data
@@ -75,79 +91,79 @@ library(greta)
 #  # sampling
 #  draws <- mcmc(m, n_samples = 1000)
 
-## ----data----------------------------------------------------------------
+## ----data---------------------------------------------------------------------
 x <- as_data(iris$Petal.Length)
 y <- as_data(iris$Sepal.Length)
 
-## ----print_greta_array---------------------------------------------------
+## ----print_greta_array--------------------------------------------------------
 as_data(iris[1:5, 1:4])
 
-## ----logical_data--------------------------------------------------------
+## ----logical_data-------------------------------------------------------------
 (is_setosa <- iris$Species[c(1, 41, 81, 121)] == "setosa")
 as_data(is_setosa)
 
-## ----dim-----------------------------------------------------------------
+## ----dim----------------------------------------------------------------------
 dim(as_data(is_setosa))
 
-## ----structures----------------------------------------------------------
+## ----structures---------------------------------------------------------------
 ones(1, 3)
 zeros(2, 2)
 
-## ----greta_array---------------------------------------------------------
+## ----greta_array--------------------------------------------------------------
 greta_array(pi, dim = c(2, 2))
 greta_array(0:1, dim = c(3, 3))
 
-## ----variables-----------------------------------------------------------
+## ----variables----------------------------------------------------------------
 int <- normal(0, 1)
 coef <- normal(0, 3)
 sd <- student(3, 0, 1, truncation = c(0, Inf))
 
-## ----int_variable--------------------------------------------------------
+## ----int_variable-------------------------------------------------------------
 (int <- variable())
 
-## ----positive_variable---------------------------------------------------
+## ----positive_variable--------------------------------------------------------
 (sd <- variable(lower = 0))
 
-## ----matrix_variable-----------------------------------------------------
+## ----matrix_variable----------------------------------------------------------
 variable(lower = 0, dim = c(2, 3))
 
-## ----truncated1----------------------------------------------------------
+## ----truncated1---------------------------------------------------------------
 (z <- normal(0, 1, truncation = c(-1, 1)))
 
-## ----linear_predictor----------------------------------------------------
+## ----linear_predictor---------------------------------------------------------
 mean <- int + coef * x
 
-## ----mean----------------------------------------------------------------
+## ----mean---------------------------------------------------------------------
 dim(mean)
 head(mean)
 
-## ----extract-------------------------------------------------------------
+## ----extract------------------------------------------------------------------
 mean[1:3]
 
-## ----replace-------------------------------------------------------------
+## ----replace------------------------------------------------------------------
 z <- zeros(4, 3)
 z[, 1] <- normal(0, 1, dim = 4)
 z
 
-## ----drop----------------------------------------------------------------
+## ----drop---------------------------------------------------------------------
 z <- matrix(1, nrow = 2, ncol = 2)
 dim(z[, 1])
 dim(z[, 1, drop = FALSE])
 
-## ----drop_greta----------------------------------------------------------
+## ----drop_greta---------------------------------------------------------------
 z_greta <- as_data(z)
 dim(z_greta[, 1])
 
-## ----function1-----------------------------------------------------------
+## ----function1----------------------------------------------------------------
 atanh <- function (z)
   (log(1 + z) - log(1 - z)) / 2
 
 atanh(z_greta)
 
-## ----likelihood----------------------------------------------------------
+## ----likelihood---------------------------------------------------------------
 distribution(y) <- normal(mean, sd)
 
-## ----hidden_model, echo = FALSE------------------------------------------
+## ----hidden_model, echo = FALSE-----------------------------------------------
 x <- as_data(iris$Petal.Length)
 y <- as_data(iris$Sepal.Length)
 int <- normal(0, 1)
@@ -156,13 +172,13 @@ sd <- student(3, 0, 1, truncation = c(0, Inf))
 mean <- int + coef * x
 distribution(y) <- normal(mean, sd)
 
-## ----define_model--------------------------------------------------------
+## ----define_model-------------------------------------------------------------
 m <- model(int, coef, sd)
 
-## ----plot, eval = FALSE--------------------------------------------------
+## ----plot, eval = FALSE-------------------------------------------------------
 #  plot(m)
 
-## ----plot_hidden, echo = FALSE-------------------------------------------
+## ----plot_hidden, echo = FALSE------------------------------------------------
 gr <- plot(m)
 DiagrammeR::export_graph(attr(gr, "dgr_graph"),
                          file_name = "figures/full_graph.png",
@@ -170,7 +186,7 @@ DiagrammeR::export_graph(attr(gr, "dgr_graph"),
                          width = 958 * 2,
                          height = 450 * 2)
 
-## ----plot_coef, echo = FALSE---------------------------------------------
+## ----plot_coef, echo = FALSE--------------------------------------------------
 coef <- normal(0, 3)
 m_coef <- model(coef)
 gr <- plot(m_coef)
@@ -180,7 +196,7 @@ DiagrammeR::export_graph(attr(gr, "dgr_graph"),
                          width = 325 * 2,
                          height = 123 * 2)
 
-## ----plot_likelihood, echo = FALSE---------------------------------------
+## ----plot_likelihood, echo = FALSE--------------------------------------------
 sd <- variable()
 y <- as_data(iris$Sepal.Length)
 mean <- ones(150)
@@ -203,14 +219,16 @@ DiagrammeR::export_graph(dgr,
                          height = 105 * 2)
 
 
-## ----mcmc, message = FALSE, results = "hide", progress = FALSE-----------
+## ----mcmc, message = FALSE, results = "hide", progress = FALSE----------------
 draws <- mcmc(m, n_samples = 1000)
 
-## ----coda_summary--------------------------------------------------------
+## ----coda_summary-------------------------------------------------------------
 summary(draws)
 
 ## ----mcmcvis, echo = TRUE, message = FALSE, out.width = c('400px', '400px'), fig.height=4, fig.width=5, fig.show='hold'----
 library (bayesplot)
+# set theme to avoid issues with fonts
+ggplot2::theme_set(ggplot2::theme_bw())
 mcmc_trace(draws, facet_args = list(nrow = 3, ncol = 1))
 mcmc_intervals(draws)
 
