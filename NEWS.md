@@ -1,3 +1,14 @@
+# greta 0.4.3
+
+## Features
+
+- Adds `reinstall_greta_deps()`, which helps with starting from a clean slate when installing greta dependencies (#524)
+
+## Fixes
+
+* Issue where `future` and `parallely` packages error when a CPU with only one core is provided (#513, #516).
+* Removes any use of `multiprocess` as it is deprecated in the `future` package (#394)
+
 # greta 0.4.2
 
 ## Fixes
