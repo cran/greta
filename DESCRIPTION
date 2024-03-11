@@ -1,7 +1,7 @@
 Type: Package
 Package: greta
 Title: Simple and Scalable Statistical Modelling in R
-Version: 0.4.4
+Version: 0.4.5
 Authors@R: c(
     person("Nick", "Golding", , "nick.golding.research@gmail.com", role = "aut",
            comment = c(ORCID = "0000-0001-8916-5570")),
@@ -64,7 +64,7 @@ Collate: 'package.R' 'utils.R' 'greta_mcmc_list.R' 'tf_functions.R'
         'test_if_forked_cluster.R' 'testthat-helpers.R' 'zzz.R'
         'internals.R'
 NeedsCompilation: no
-Packaged: 2024-02-02 00:14:25 UTC; njtierney
+Packaged: 2024-03-11 06:20:23 UTC; nick
 Author: Nick Golding [aut] (<https://orcid.org/0000-0001-8916-5570>),
   Nicholas Tierney [aut, cre] (<https://orcid.org/0000-0003-1460-8722>),
   Simon Dirmeier [ctb],
@@ -81,4 +81,4 @@ Author: Nick Golding [aut] (<https://orcid.org/0000-0001-8916-5570>),
   Jian Yen [ctb]
 Maintainer: Nicholas Tierney <nicholas.tierney@gmail.com>
 Repository: CRAN
-Date/Publication: 2024-02-02 01:00:03 UTC
+Date/Publication: 2024-03-11 08:10:02 UTC

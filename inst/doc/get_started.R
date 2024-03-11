@@ -28,7 +28,7 @@ file.copy("../man/figures/plotlegend.png",
 #  devtools::install_github("greta-dev/greta")
 
 ## ----load---------------------------------------------------------------------
-library(greta)
+#  library(greta)
 
 ## ----install_tensorflow, eval = FALSE-----------------------------------------
 #  reticulate::install_miniconda()
@@ -60,14 +60,14 @@ library(greta)
 #  install.packages("DiagrammeR")
 
 ## ----ones---------------------------------------------------------------------
-(z <- ones(3, 3))
+#  (z <- ones(3, 3))
 
 ## ----ones_op------------------------------------------------------------------
-(z2 <- z + z ^ 2)
+#  (z2 <- z + z ^ 2)
 
 ## ----variable-----------------------------------------------------------------
-(a <- variable(dim = c(3, 3)))
-(a2 <- a + a ^ 2)
+#  (a <- variable(dim = c(3, 3)))
+#  (a2 <- a + a ^ 2)
 
 ## ----first_model, eval = FALSE------------------------------------------------
 #  library(greta)
@@ -97,85 +97,85 @@ library(greta)
 #  draws <- mcmc(m, n_samples = 1000)
 
 ## ----data---------------------------------------------------------------------
-x <- as_data(iris$Petal.Length)
-y <- as_data(iris$Sepal.Length)
+#  x <- as_data(iris$Petal.Length)
+#  y <- as_data(iris$Sepal.Length)
 
 ## ----print_greta_array--------------------------------------------------------
-as_data(iris[1:5, 1:4])
+#  as_data(iris[1:5, 1:4])
 
 ## ----logical_data-------------------------------------------------------------
-(is_setosa <- iris$Species[c(1, 41, 81, 121)] == "setosa")
-as_data(is_setosa)
+#  (is_setosa <- iris$Species[c(1, 41, 81, 121)] == "setosa")
+#  as_data(is_setosa)
 
 ## ----dim----------------------------------------------------------------------
-dim(as_data(is_setosa))
+#  dim(as_data(is_setosa))
 
 ## ----structures---------------------------------------------------------------
-ones(1, 3)
-zeros(2, 2)
+#  ones(1, 3)
+#  zeros(2, 2)
 
 ## ----greta_array--------------------------------------------------------------
-greta_array(pi, dim = c(2, 2))
-greta_array(0:1, dim = c(3, 3))
+#  greta_array(pi, dim = c(2, 2))
+#  greta_array(0:1, dim = c(3, 3))
 
 ## ----variables----------------------------------------------------------------
-int <- normal(0, 1)
-coef <- normal(0, 3)
-sd <- student(3, 0, 1, truncation = c(0, Inf))
+#  int <- normal(0, 1)
+#  coef <- normal(0, 3)
+#  sd <- student(3, 0, 1, truncation = c(0, Inf))
 
 ## ----int_variable-------------------------------------------------------------
-(int <- variable())
+#  (int <- variable())
 
 ## ----positive_variable--------------------------------------------------------
-(sd <- variable(lower = 0))
+#  (sd <- variable(lower = 0))
 
 ## ----matrix_variable----------------------------------------------------------
-variable(lower = 0, dim = c(2, 3))
+#  variable(lower = 0, dim = c(2, 3))
 
 ## ----truncated1---------------------------------------------------------------
-(z <- normal(0, 1, truncation = c(-1, 1)))
+#  (z <- normal(0, 1, truncation = c(-1, 1)))
 
 ## ----linear_predictor---------------------------------------------------------
-mean <- int + coef * x
+#  mean <- int + coef * x
 
 ## ----mean---------------------------------------------------------------------
-dim(mean)
-head(mean)
+#  dim(mean)
+#  head(mean)
 
 ## ----extract------------------------------------------------------------------
-mean[1:3]
+#  mean[1:3]
 
 ## ----replace------------------------------------------------------------------
-z <- zeros(4, 3)
-z[, 1] <- normal(0, 1, dim = 4)
-z
+#  z <- zeros(4, 3)
+#  z[, 1] <- normal(0, 1, dim = 4)
+#  z
 
 ## ----drop---------------------------------------------------------------------
-z <- matrix(1, nrow = 2, ncol = 2)
-dim(z[, 1])
-dim(z[, 1, drop = FALSE])
+#  z <- matrix(1, nrow = 2, ncol = 2)
+#  dim(z[, 1])
+#  dim(z[, 1, drop = FALSE])
 
 ## ----drop_greta---------------------------------------------------------------
-z_greta <- as_data(z)
-dim(z_greta[, 1])
+#  z_greta <- as_data(z)
+#  dim(z_greta[, 1])
 
 ## ----function1----------------------------------------------------------------
-atanh <- function (z)
-  (log(1 + z) - log(1 - z)) / 2
-
-atanh(z_greta)
+#  atanh <- function (z)
+#    (log(1 + z) - log(1 - z)) / 2
+#  
+#  atanh(z_greta)
 
 ## ----likelihood---------------------------------------------------------------
-distribution(y) <- normal(mean, sd)
+#  distribution(y) <- normal(mean, sd)
 
 ## ----hidden_model, echo = FALSE-----------------------------------------------
-x <- as_data(iris$Petal.Length)
-y <- as_data(iris$Sepal.Length)
-int <- normal(0, 1)
-coef <- normal(0, 3)
-sd <- student(3, 0, 1, truncation = c(0, Inf))
-mean <- int + coef * x
-distribution(y) <- normal(mean, sd)
+#  x <- as_data(iris$Petal.Length)
+#  y <- as_data(iris$Sepal.Length)
+#  int <- normal(0, 1)
+#  coef <- normal(0, 3)
+#  sd <- student(3, 0, 1, truncation = c(0, Inf))
+#  mean <- int + coef * x
+#  distribution(y) <- normal(mean, sd)
 
 ## ----define_model, eval=FALSE-------------------------------------------------
 #  m <- model(int, coef, sd)
