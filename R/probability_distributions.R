@@ -5,64 +5,13 @@ uniform_distribution <- R6Class(
     min = NA,
     max = NA,
     initialize = function(min, max, dim) {
-      if (inherits(min, "greta_array") | inherits(max, "greta_array")) {
-        msg <- cli::format_error(
-          "{.arg min} and {.arg max} must be fixed, they cannot be another \\
-          greta array"
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
-
-      good_types <- is.numeric(min) && length(min) == 1 &
-        is.numeric(max) && length(max) == 1
-
-      if (!good_types) {
-        msg <- cli::format_error(
-          c(
-            "{.arg min} and {.arg max} must be numeric vectors of length 1",
-            "They have class and length:",
-            "{.arg min}: {class(min)}, {length(min)}",
-            "{.arg max}: {class(max)}, {length(max)}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
-
-      if (!is.finite(min) | !is.finite(max)) {
-        msg <- cli::format_error(
-          c(
-            "{.arg min} and {.arg max} must finite scalars",
-            "Their values are:",
-            "{.arg min}: {min}",
-            "{.arg max}: {max}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
-
-      if (min >= max) {
-        msg <- cli::format_error(
-          c(
-            "{.arg max} must be greater than {.arg min}",
-            "Their values are:",
-            "{.arg min}: {min}",
-            "{.arg max}: {max}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_param_greta_array(min)
+      check_param_greta_array(max)
+      check_numeric_length_1(min)
+      check_numeric_length_1(max)
+      check_finite(min)
+      check_finite(max)
+      check_x_gte_y(min, max)
 
       # store min and max as numeric scalars (needed in create_target, done in
       # initialisation)
@@ -101,6 +50,7 @@ normal_distribution <- R6Class(
   inherit = distribution_node,
   public = list(
     initialize = function(mean, sd, dim, truncation) {
+      ## browser()
       mean <- as.greta_array(mean)
       sd <- as.greta_array(sd)
 
@@ -110,6 +60,8 @@ normal_distribution <- R6Class(
       self$add_parameter(mean, "mean")
       self$add_parameter(sd, "sd")
     },
+    # TODO
+    # why is "dag" an argument here?
     tf_distrib = function(parameters, dag) {
       tfp$distributions$Normal(
         loc = parameters$mean,
@@ -432,7 +384,7 @@ inverse_gamma_distribution <- R6Class(
     tf_distrib = function(parameters, dag) {
       tfp$distributions$InverseGamma(
         concentration = parameters$alpha,
-        rate = parameters$beta
+        scale = parameters$beta
       )
     }
     # nolint end
@@ -460,7 +412,7 @@ weibull_distribution <- R6Class(
       b <- parameters$scale
 
       # use the TFP Weibull CDF bijector
-      bijector <- tfp$bijectors$Weibull(scale = b, concentration = a)
+      bijector <- tfp$bijectors$WeibullCDF(scale = b, concentration = a)
 
       log_prob <- function(x) {
         log(a) - log(b) + (a - fl(1)) * (log(x) - log(b)) - (x / b)^a
@@ -863,7 +815,9 @@ multinomial_distribution <- R6Class(
     tf_distrib = function(parameters, dag) {
       parameters$size <- tf_flatten(parameters$size)
       # scale probs to get absolute density correct
-      parameters$prob <- parameters$prob / tf_sum(parameters$prob)
+      # parameters$prob <- parameters$prob / tf_sum(parameters$prob)
+      parameters$prob <- parameters$prob / tf_rowsums(parameters$prob,
+                                                      dims = 1L)
 
       tfp$distributions$Multinomial(
         total_count = parameters$size,
@@ -900,7 +854,8 @@ categorical_distribution <- R6Class(
     tf_distrib = function(parameters, dag) {
       # scale probs to get absolute density correct
       probs <- parameters$prob
-      probs <- probs / tf_sum(probs)
+      # probs <- probs / tf_sum(probs)
+      probs <- probs / tf_rowsums(probs, dims = 1L)
       tfp$distributions$Multinomial(
         total_count = fl(1),
         probs = probs
@@ -929,41 +884,10 @@ multivariate_normal_distribution <- R6Class(
         dimension = dimension
       )
 
-      # check dimensions of Sigma
-      if (nrow(sigma) != ncol(sigma) |
-        length(dim(sigma)) != 2) {
-        msg <- cli::format_error(
-          c(
-            "{.arg Sigma} must be a square 2D greta array",
-            "However {.arg Sigma} has dimensions \\
-            {.val {paste(dim(sigma), collapse = 'x')}}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_sigma_square_2d_greta_array(sigma)
+      check_mean_sigma_have_same_dimensions(mean, sigma)
 
-      # compare possible dimensions
-      dim_mean <- ncol(mean)
-      dim_sigma <- nrow(sigma)
-
-      if (dim_mean != dim_sigma) {
-        msg <- cli::format_error(
-          c(
-            "{.arg mean} and {.arg Sigma} must have the same dimensions",
-            "However they are different: {dim_mean} vs {dim_sigma}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
-
-      # coerce the parameter arguments to nodes and add as parents and
-      # parameters
+      # coerce parameter arguments to nodes and add as parents and parameters
       super$initialize("multivariate_normal", dim, multivariate = TRUE)
 
       if (has_representation(sigma, "cholesky")) {
@@ -1004,38 +928,25 @@ wishart_distribution <- R6Class(
   inherit = distribution_node,
   public = list(
 
+    # TF1/2 - consider setting this as NULL for debugging purposes
     # set when defining the distribution
     sigma_is_cholesky = FALSE,
 
+    # TF1/2 - consider setting this as NULL for debugging purposes
     # set when defining the graph
     target_is_cholesky = FALSE,
     initialize = function(df, Sigma) { # nolint
       # add the nodes as parents and parameters
-
       df <- as.greta_array(df)
       sigma <- as.greta_array(Sigma)
 
       # check dimensions of Sigma
-      if (nrow(sigma) != ncol(sigma) |
-        length(dim(sigma)) != 2) {
-        msg <- cli::format_error(
-          c(
-            "{.arg Sigma} must be a square 2D greta array",
-            "However, {.arg Sigma} has dimensions ",
-            "{.val {paste(dim(sigma), collapse = 'x')}}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_sigma_square_2d_greta_array(sigma)
 
       dim <- nrow(sigma)
 
       # initialize with a cholesky factor
       super$initialize("wishart", dim(sigma), multivariate = TRUE)
-
       # set parameters
       if (has_representation(sigma, "cholesky")) {
         sigma <- representation(sigma, "cholesky")
@@ -1051,7 +962,6 @@ wishart_distribution <- R6Class(
     # create a variable, and transform to a symmetric matrix (with cholesky
     # factor representation)
     create_target = function(truncation) {
-
       # create cholesky factor variable greta array
       chol_greta_array <- cholesky_variable(self$dim[1])
 
@@ -1060,6 +970,7 @@ wishart_distribution <- R6Class(
 
       # return the node for the symmetric matrix
       target_node <- get_node(matrix_greta_array)
+
       target_node
     },
 
@@ -1080,12 +991,10 @@ wishart_distribution <- R6Class(
       self$target_is_cholesky <- FALSE
     },
     tf_distrib = function(parameters, dag) {
-
       # this is messy, we want to use the tfp wishart, but can't define the
       # density without expanding the dimension of x
 
       log_prob <- function(x) {
-
         # reshape the dimensions
         df <- tf_flatten(parameters$df)
         sigma <- tf$expand_dims(parameters$sigma, 1L)
@@ -1106,13 +1015,22 @@ wishart_distribution <- R6Class(
         }
 
         # use the density for choleskied x, with choleskied Sigma
-        distrib <- tfp$distributions$Wishart(
+        distrib <- tfp$distributions$WishartTriL(
           df = df,
           scale_tril = sigma_chol,
           input_output_cholesky = TRUE
         )
 
-        distrib$log_prob(x_chol)
+        log_prob_raw <- distrib$log_prob(x_chol)
+
+        # add an adjustment for the implicit chol2symm bijection in using the
+        # choleskied distribution, rather than the symmetric matrix version
+        chol2symm_bijector <- tfp$bijectors$CholeskyOuterProduct()
+        adjustment <- chol2symm_bijector$forward_log_det_jacobian(x_chol)
+        log_prob <- log_prob_raw + adjustment
+
+        log_prob
+
       }
 
       sample <- function(seed) {
@@ -1127,17 +1045,23 @@ wishart_distribution <- R6Class(
         }
 
         # use the density for choleskied x, with choleskied Sigma
-        distrib <- tfp$distributions$Wishart(
+        chol_distrib <- tfp$distributions$WishartTriL(
           df = df,
-          scale_tril = sigma_chol
+          scale_tril = sigma_chol,
+          input_output_cholesky = TRUE
         )
 
-        draws <- distrib$sample(seed = seed)
+        ## TF1/2
+        ## The issue with getting the cholesky part of the Wishart
+        ## isn't happening here,
+        ## This produces something that looks about right
+        chol_draws <- chol_distrib$sample(seed = seed)
 
-        if (self$target_is_cholesky) {
-          draws <- tf_chol(draws)
-        }
-
+        # equivalent to (but faster than) tf_chol2symm(tf_transpose(chol_draws))
+        # the transpose is needed because TF uses lower triangular
+        # (non-zeros are in bottom left)
+        # and R uses upper triangular (non zeroes are in top right)
+        draws <- tf$matmul(chol_draws, chol_draws, adjoint_b = TRUE)
         draws
       }
 
@@ -1153,38 +1077,18 @@ lkj_correlation_distribution <- R6Class(
 
     # set when defining the graph
     target_is_cholesky = FALSE,
+    eta_is_cholesky = FALSE,
     initialize = function(eta, dimension = 2) {
       dimension <- check_dimension(target = dimension)
 
-      if (!inherits(eta, "greta_array")) {
-        if (!is.numeric(eta) || !length(eta) == 1 || eta <= 0) {
-          msg <- cli::format_error(
-            "{.arg eta} must be a positive scalar value, or a scalar \\
-            {.cls greta_array}"
-          )
-          stop(
-            msg,
-            call. = FALSE
-          )
-        }
+      if (!is.greta_array(eta)) {
+        check_positive_scalar(eta)
       }
 
       # add the nodes as parents and parameters
       eta <- as.greta_array(eta)
 
-      if (!is_scalar(eta)) {
-        msg <- cli::format_error(
-          c(
-            "{.arg eta} must be a scalar",
-            "However {.arg eta} had dimensions: \\
-            {paste0(dim(eta), collapse = ', ')}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_scalar(eta)
 
       dim <- c(dimension, dimension)
       super$initialize("lkj_correlation", dim, multivariate = TRUE)
@@ -1210,6 +1114,7 @@ lkj_correlation_distribution <- R6Class(
       target_node
     },
 
+    # NOTE: this code is repeated above on line 1032, is that intended?
     # get a cholesky factor for the target if possible
     get_tf_target_node = function() {
       target <- self$target
@@ -1230,31 +1135,63 @@ lkj_correlation_distribution <- R6Class(
       eta <- tf$squeeze(parameters$eta, 1:2)
       dim <- self$dim[1]
 
-      distrib <- tfp$distributions$LKJ(
-        dimension = dim,
-        concentration = eta,
-        input_output_cholesky = self$target_is_cholesky
-      )
+      log_prob <- function(x){
+        if (self$target_is_cholesky) {
+          x_chol <- tf$linalg$matrix_transpose(x)
+        } else {
+          x_chol <- tf$linalg$cholesky(x)
+        }
+
+        chol_distrib <- tfp$distributions$CholeskyLKJ(
+          dimension = dim,
+          concentration = eta
+        )
+
+        # NOTE there seems to be a difference with our implementation of
+        # normalising constant of the log prob. So we need to find a different
+        # reference implementation of the normalising constant. This does not
+        # impact MCMC or sampling, but may affect future uses of this.
+        # e.g., the integration and marginalisation interface
+        # chol_distrib$log_prob(x_chol)
+
+        log_prob_raw <- chol_distrib$log_prob(x_chol)
+
+        # add an adjustment for the implicit chol2symm bijection in using the
+        # choleskied distribution, rather than the symmetric matrix version
+        chol2symm_bijector <- tfp$bijectors$CholeskyOuterProduct()
+        adjustment <- chol2symm_bijector$forward_log_det_jacobian(x_chol)
+        log_prob <- log_prob_raw + adjustment
+
+        log_prob
+
+      }
 
       # tfp's lkj sampling can't detect the size of the output from eta, for
-      # some reason. But we can use map_fun to apply their simulation to each
+      # some reason. But we can use map_fn to apply their simulation to each
       # element of eta.
       sample <- function(seed) {
         sample_once <- function(eta) {
-          d <- tfp$distributions$LKJ(
+          d <- tfp$distributions$CholeskyLKJ(
             dimension = dim,
-            concentration = eta,
-            input_output_cholesky = self$target_is_cholesky
+            concentration = eta
           )
 
-          d$sample(seed = seed)
+          chol_draws <- d$sample(seed = seed)
+
+          # equivalent to (but faster than) tf_chol2symm(tf_transpose(chol_draws))
+          # the transpose is needed because TF uses lower triangular
+          # (non-zeros are in bottom left)
+          # and R uses upper triangular (non zeroes are in top right)
+          draws <- tf$matmul(chol_draws, chol_draws, adjoint_b = TRUE)
+          draws
+
         }
 
         tf$map_fn(sample_once, eta)
       }
 
       list(
-        log_prob = distrib$log_prob,
+        log_prob = log_prob,
         sample = sample
       )
     }
@@ -1467,6 +1404,7 @@ uniform <- function(min, max, dim = NULL) {
 #' @rdname distributions
 #' @export
 normal <- function(mean, sd, dim = NULL, truncation = c(-Inf, Inf)) {
+  ##browser()
   distrib("normal", mean, sd, dim, truncation)
 }
 

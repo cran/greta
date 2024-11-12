@@ -86,19 +86,7 @@ log1pe <- function(x) {
 imultilogit <- function(x) {
   dim <- dim(x)
 
-  # check it's a matrix
-  if (length(dim) != 2) {
-    msg <- cli::format_error(
-      c(
-        "{.fun imultilogit} must have a 2D greta array",
-        "{.code dim(x)} returns: {dim(x)}"
-      )
-    )
-    stop(
-      msg,
-      call. = FALSE
-    )
-  }
+  check_2d(x)
 
   op("imultilogit", x,
     dim = dim + c(0, 1),

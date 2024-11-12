@@ -144,8 +144,11 @@ NULL
 `%*%` <- function(x, y) { # nolint
 
   # if y is a greta array, coerce x before dispatch
-  if (inherits(y, "greta_array") & !inherits(x, "greta_array")) {
+  if (is.greta_array(y) & !is.greta_array(x)) {
     as_data(x) %*% y
+  # if y is not a greta array and x is, coerce y before dispatch
+  } else if (!is.greta_array(y) & is.greta_array(x)){
+    x %*% as_data(y)
   } else {
     UseMethod("%*%", x)
   }
@@ -154,31 +157,8 @@ NULL
 #' @export
 `%*%.greta_array` <- function(x, y) { # nolint
 
-  # check they're matrices
-  if (length(dim(x)) != 2 | length(dim(y)) != 2) {
-    msg <- cli::format_error(
-      c(
-        "only two-dimensional {.cls greta_array}s can be matrix-multiplied",
-        "dimensions recorded were {dim(x)}"
-      )
-    )
-    stop(
-      msg,
-      call. = FALSE
-    )
-  }
-
-  # check the dimensions match
-  if (dim(x)[2] != dim(y)[1]) {
-    msg <- cli::format_message(
-      c(
-        "incompatible dimensions: \\
-        {.val {paste0(dim(x), collapse = 'x')}} vs \\
-        {.val {paste0(dim(y), collapse = 'x')}}"
-      )
-    )
-    stop(msg, call. = FALSE)
-  }
+  check_both_2d(x,y)
+  check_compatible_dimensions(x, y)
 
   op("matrix multiply", x, y,
     dim = c(nrow(x), ncol(y)),

@@ -1,5 +1,3 @@
-# package file
-
 #' greta: simple and scalable statistical modelling in R
 #' @name greta
 #'
@@ -17,7 +15,6 @@
 #'   [tutorials](https://greta-stats.org/articles/get_started.html) and
 #'   [examples](https://greta-stats.org/articles/example_models.html).
 #'
-#' @docType package
 #' @importFrom tensorflow tf
 #' @examples
 #' \dontrun{
@@ -40,5 +37,14 @@
 
 # clear CRAN checks spotting floating global variables
 #' @importFrom utils globalVariables
-utils::globalVariables("N", "greta")
-
+utils::globalVariables(
+  c("N",
+  "greta_deps_tf_tfp",
+  "greta_logfile",
+  "os",
+  "python_version_max",
+  "python_version_min",
+  "tf_version",
+  "tfp_version",
+  "greta")
+)

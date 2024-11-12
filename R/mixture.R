@@ -83,18 +83,7 @@ mixture_distribution <- R6Class(
     initialize = function(dots, weights, dim) {
       n_distributions <- length(dots)
 
-      if (n_distributions < 2) {
-        msg <- cli::format_error(
-          c(
-            "{.fun mixture} must be passed at least two distributions",
-            "The number of distributions passed was: {.val {n_distributions}}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_num_distributions(n_distributions, at_least = 2, name = "mixture")
 
       # check the dimensions of the variables in dots
       dim <- do.call(check_dims, c(dots, target_dim = dim))
@@ -108,47 +97,10 @@ mixture_distribution <- R6Class(
         self$weights_is_log <- TRUE
       }
 
-      # weights should have n_distributions as the first dimension
-      if (weights_dim[1] != n_distributions) {
-        msg <- cli::format_error(
-          c(
-            "the first dimension of weights must be the number of \\
-            distributions in the mixture ({.val {n_distributions}})",
-            "However it was {.val {weights_dim[1]}}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
-
       # drop a trailing 1 from dim, so user doesn't need to deal with it
       # Ugh, need to get rid of column vector thing soon.
-      weights_extra_dim <- dim
-      n_extra_dim <- length(weights_extra_dim)
-      if (weights_extra_dim[n_extra_dim] == 1) {
-        weights_extra_dim <- weights_extra_dim[-n_extra_dim]
-      }
-
-      # remainder should be 1 or match weights_extra_dim
-      w_dim <- weights_dim[-1]
-      dim_1 <- length(w_dim) == 1 && w_dim == 1
-      dim_same <- all(w_dim == weights_extra_dim)
-      if (!(dim_1 | dim_same)) {
-        msg <- cli::format_error(
-          c(
-            "the dimension of weights must be either \\
-            {.val {n_distributions}x1} or \\
-            {.val {n_distributions}x{paste(dim, collapse = 'x')}}",
-            " but was {.val {paste(weights_dim, collapse = 'x')}}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      # TODO get rid of column vector thing?
+      check_weights_dim(weights_dim, dim, n_distributions)
 
       dot_nodes <- lapply(dots, get_node)
 
@@ -162,16 +114,7 @@ mixture_distribution <- R6Class(
       # check the distributions are all either discrete or continuous
       discrete <- vapply(distribs, member, "discrete", FUN.VALUE = logical(1))
 
-      if (!all(discrete) & !all(!discrete)) {
-        msg <- cli::format_error(
-          "cannot construct a mixture from a combination of discrete and \\
-          continuous distributions"
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_not_discrete_continuous(discrete, name = "mixture")
 
       # check the distributions are all either multivariate or univariate
       multivariate <- vapply(distribs,
@@ -180,46 +123,17 @@ mixture_distribution <- R6Class(
         FUN.VALUE = logical(1)
       )
 
-      if (!all(multivariate) & !all(!multivariate)) {
-        msg <- cli::format_error(
-          "cannot construct a mixture from a combination of multivariate and \\
-          univariate distributions"
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_not_multivariate_univariate(multivariate)
 
       # ensure the support and bounds of each of the distributions is the same
       truncations <- lapply(distribs, member, "truncation")
       bounds <- lapply(distribs, member, "bounds")
 
-      truncated <- !vapply(truncations, is.null, logical(1))
+      truncated <- !are_null(truncations)
       supports <- bounds
       supports[truncated] <- truncations[truncated]
 
-      n_supports <- length(unique(supports))
-      if (n_supports != 1) {
-        supports_text <- vapply(
-          X = unique(supports),
-          FUN = paste,
-          collapse = " to ",
-          FUN.VALUE = character(1)
-        )
-
-        msg <- cli::format_error(
-          c(
-            "component distributions must have the same support",
-            "However the component distributions have different support:",
-            "{.val {paste(supports_text, collapse = ' vs. ')}}"
-          )
-        )
-        stop(
-          msg,
-          call. = FALSE
-        )
-      }
+      check_distribution_support(supports)
 
       # get the maximal bounds for all component distributions
       bounds <- c(
@@ -302,11 +216,11 @@ mixture_distribution <- R6Class(
         dim_weights <- dim(log_weights)
         extra_dims <- unlist(dim(log_probs_arr)[-seq_along(dim_weights)])
         for (dim in extra_dims) {
-          ndim <- length(dim(log_weights))
+          ndim <- n_dim(log_weights)
           log_weights <- tf$expand_dims(log_weights, ndim)
           if (dim > 1L) {
             tiling <- c(rep(1L, ndim), dim)
-            tf_tiling <- tf$constant(tiling, shape = list(ndim + 1))
+            tf_tiling <- tf$constant(tiling, shape = list(as.integer(ndim + 1)))
             log_weights <- tf$tile(log_weights, tf_tiling)
           }
         }
